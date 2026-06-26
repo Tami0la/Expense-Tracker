@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Expense Tracker:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/Expense_Tracker_jar</output-path>
+    <root id="archive" name="Expense Tracker.jar">
+      <element id="module-output" name="Expense Tracker" />
+    </root>
+  </artifact>
+</component>
