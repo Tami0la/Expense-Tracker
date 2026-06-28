@@ -3,6 +3,7 @@ package com.expensetracker;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.File;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
@@ -12,8 +13,7 @@ import java.util.Map;
 public class ConsoleApp {
     private ExpenseManager expenseManager;
     private BudgetManager budgetManager;
-    private static final String CSV_FILE = "expenses.csv";
-
+    private static final String CSV_FILE = System.getProperty("user.home") + "/Desktop/PERSONAL PROJECTS/Expense Tracker/expenses.csv";
     private JFrame frame;
     private JTable table;
     private DefaultTableModel tableModel;
@@ -27,6 +27,12 @@ public class ConsoleApp {
     public ConsoleApp() {
         expenseManager = new ExpenseManager();
         budgetManager = new BudgetManager();
+
+        // Create the Documents/ExpenseTracker folder if it doesn't exist
+        File dataDir = new File(System.getProperty("user.home") + "/Desktop/PERSONAL PROJECTS/Expense Tracker");
+        if (!dataDir.exists()) {
+            dataDir.mkdirs();
+        }
 
         try {
             expenseManager.loadFromCsv(CSV_FILE);
