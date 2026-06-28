@@ -291,12 +291,12 @@ public class ConsoleApp {
                 writer.newLine();
                 writer.write("Salary,,," + salary);
                 writer.newLine();
-                // Excel formula for total spent: SUM of column E from row 2 to rowCount
+                // Excel formula for total spent: result in column D, summing column E from row 2 to rowCount
                 writer.write("Total Spent,,,=SUM(E2:E" + rowCount + ")");
                 writer.newLine();
                 // Excel formula for balance: Salary - Total Spent
-                // Salary is at E(rowCount+2), Total Spent is at E(rowCount+3)
-                writer.write("Balance,,,=E" + (rowCount + 2) + "-E" + (rowCount + 3));
+                // Salary is at D(rowCount+2), Total Spent is at D(rowCount+3)
+                writer.write("Balance,,,=D" + (rowCount + 2) + "-D" + (rowCount + 3));
                 writer.newLine();
 
                 JOptionPane.showMessageDialog(frame, "Report exported to " + fileName);
