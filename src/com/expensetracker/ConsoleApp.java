@@ -13,7 +13,11 @@ import java.util.Map;
 public class ConsoleApp {
     private ExpenseManager expenseManager;
     private BudgetManager budgetManager;
-    private static final String CSV_FILE = System.getProperty("user.home") + "/Desktop/PERSONAL PROJECTS/Expense Tracker/expenses.csv";
+
+    // Absolute path to your data folder (on Desktop)
+    private static final String DATA_DIR = System.getProperty("user.home") + "/Desktop/PERSONAL PROJECTS/Expense Tracker/";
+    private static final String CSV_FILE = DATA_DIR + "expenses.csv";
+
     private JFrame frame;
     private JTable table;
     private DefaultTableModel tableModel;
@@ -28,8 +32,8 @@ public class ConsoleApp {
         expenseManager = new ExpenseManager();
         budgetManager = new BudgetManager();
 
-        // Create the Documents/ExpenseTracker folder if it doesn't exist
-        File dataDir = new File(System.getProperty("user.home") + "/Desktop/PERSONAL PROJECTS/Expense Tracker");
+        // Create the directory if it doesn't exist
+        File dataDir = new File(DATA_DIR);
         if (!dataDir.exists()) {
             dataDir.mkdirs();
         }
@@ -254,8 +258,6 @@ public class ConsoleApp {
     private void saveData() {
         try {
             expenseManager.saveToCsv(CSV_FILE);
-            // Since BudgetManager doesn't have save/load in ConsoleApp, I'm not adding it here to keep parity, 
-            // though it would be a good addition. ConsoleApp also doesn't save budgets to file.
         } catch (Exception e) {
             JOptionPane.showMessageDialog(frame, "Error saving data: " + e.getMessage());
         }
@@ -281,11 +283,20 @@ public class ConsoleApp {
                 // Default to 0 if invalid
             }
 
+            // Use the same directory as the CSV_FILE
+            File dir = new File(DATA_DIR);
+            if (!dir.exists() && !dir.mkdirs()) {
+                JOptionPane.showMessageDialog(frame, "Cannot create directory: " + DATA_DIR);
+                return;
+            }
+
             String fileName = "Report_" + input + ".csv";
-            try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(fileName))) {
+            File exportFile = new File(dir, fileName);
+
+            try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(exportFile))) {
                 writer.write("ID,Date,Category,Description,Amount");
                 writer.newLine();
-                
+
                 int rowCount = 1; // header is row 1
                 for (Expense e : monthlyExpenses) {
                     writer.write(String.format("%d,%s,%s,\"%s\",%.2f",
@@ -293,19 +304,16 @@ public class ConsoleApp {
                     writer.newLine();
                     rowCount++;
                 }
-                
+
                 writer.newLine();
                 writer.write("Salary,,," + salary);
                 writer.newLine();
-                // Excel formula for total spent: result in column D, summing column E from row 2 to rowCount
                 writer.write("Total Spent,,,=SUM(E2:E" + rowCount + ")");
                 writer.newLine();
-                // Excel formula for balance: Salary - Total Spent
-                // Salary is at D(rowCount+2), Total Spent is at D(rowCount+3)
                 writer.write("Balance,,,=D" + (rowCount + 2) + "-D" + (rowCount + 3));
                 writer.newLine();
 
-                JOptionPane.showMessageDialog(frame, "Report exported to " + fileName);
+                JOptionPane.showMessageDialog(frame, "Report exported to " + exportFile.getAbsolutePath());
             } catch (java.io.IOException e) {
                 JOptionPane.showMessageDialog(frame, "Error exporting: " + e.getMessage());
             }
