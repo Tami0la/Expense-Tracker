@@ -19,6 +19,7 @@ public class Expense {
 
     // Getters and setters (only those you really need to change after creation)
     public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
     public LocalDate getDate() { return date; }
     public void setDate(LocalDate date) { this.date = date; }
     public Category getCategory() { return category; }
@@ -48,7 +49,7 @@ public class Expense {
         String[] parts = csvLine.split(",(?=([^\"]*\"[^\"]*\")*[^\"]*$)", -1);
         int id = Integer.parseInt(parts[0].trim());
         LocalDate date = LocalDate.parse(parts[1].trim());
-        Category category = Category.valueOf(parts[2].trim().toUpperCase());
+        Category category = new Category(parts[2].trim().toUpperCase());
         // Remove surrounding quotes and unescape double quotes
         String desc = parts[3].trim();
         if (desc.startsWith("\"") && desc.endsWith("\"")) {

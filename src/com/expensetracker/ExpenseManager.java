@@ -17,6 +17,7 @@ public class ExpenseManager {
     public Expense addExpense(LocalDate date, Category category, String description, double amount) {
         Expense e = new Expense(nextId++, date, category, description, amount);
         expenses.add(e);
+        reindexExpenses(); // Ensure everything is strictly sequential
         return e;
     }
 
@@ -32,7 +33,20 @@ public class ExpenseManager {
     }
 
     public boolean deleteExpense(int id) {
-        return expenses.removeIf(e -> e.getId() == id);
+        boolean removed = expenses.removeIf(e -> e.getId() == id);
+        if (removed) {
+            reindexExpenses();
+        }
+        return removed;
+    }
+
+    private void reindexExpenses() {
+        for (int i = 0; i < expenses.size(); i++) {
+            // We need a way to set the ID. Let's add a setter to Expense or use reflection.
+            // Actually, we can just create new Expense objects or add setId to Expense.
+            expenses.get(i).setId(i + 1);
+        }
+        nextId = expenses.size() + 1;
     }
 
     public Expense findById(int id) {
@@ -73,14 +87,12 @@ public class ExpenseManager {
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String header = reader.readLine(); // skip header
             String line;
-            int maxId = 0;
             while ((line = reader.readLine()) != null) {
                 if (line.trim().isEmpty()) continue;
                 Expense e = Expense.fromCsvString(line);
                 expenses.add(e);
-                if (e.getId() > maxId) maxId = e.getId();
             }
-            nextId = maxId + 1;
+            reindexExpenses(); // Ensure IDs are sequential and nextId is set correctly
         }
     }
 }
