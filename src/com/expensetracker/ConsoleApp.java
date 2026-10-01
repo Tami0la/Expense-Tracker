@@ -25,6 +25,7 @@ public class ConsoleApp {
     private JTable table;
     private DefaultTableModel tableModel;
     private JComboBox<String> monthFilterBox;
+    private JTextField searchField;
 
     private JTextField dateField;
     private JComboBox<Object> categoryBox;
@@ -113,6 +114,15 @@ public class ConsoleApp {
         });
         filterPanel.add(monthFilterBox);
 
+        filterPanel.add(new JLabel("   Search:"));
+        searchField = new JTextField(15);
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { refreshTable(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { refreshTable(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { refreshTable(); }
+        });
+        filterPanel.add(searchField);
+
         JPanel salaryPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         salaryDisplayLabel = new JLabel("Monthly Salary: 0.00");
         salaryDisplayLabel.setFont(new Font("Arial", Font.BOLD, 14));
@@ -179,6 +189,9 @@ public class ConsoleApp {
 
         // --- Action Buttons ---
         JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton editButton = new JButton("Edit Selected");
+        editButton.addActionListener(e -> editExpense());
+        
         JButton deleteButton = new JButton("Delete Selected");
         deleteButton.addActionListener(e -> deleteExpense());
 
@@ -197,6 +210,7 @@ public class ConsoleApp {
         JButton saveButton = new JButton("Save");
         saveButton.addActionListener(e -> saveData());
 
+        actionPanel.add(editButton);
         actionPanel.add(deleteButton);
         actionPanel.add(setBudgetButton);
         actionPanel.add(viewAlertsButton);
@@ -243,15 +257,23 @@ public class ConsoleApp {
         } else {
             toDisplay = expenseManager.getAllExpenses();
         }
+
+        String searchText = (searchField != null) ? searchField.getText().toLowerCase().trim() : "";
         
         for (Expense e : toDisplay) {
-            tableModel.addRow(new Object[]{
-                    e.getId(),
-                    e.getDate(),
-                    e.getCategory(),
-                    e.getDescription(),
-                    String.format("%.2f", e.getAmount())
-            });
+            boolean matchesSearch = searchText.isEmpty() ||
+                    e.getDescription().toLowerCase().contains(searchText) ||
+                    e.getCategory().getName().toLowerCase().contains(searchText);
+
+            if (matchesSearch) {
+                tableModel.addRow(new Object[]{
+                        e.getId(),
+                        e.getDate(),
+                        e.getCategory(),
+                        e.getDescription(),
+                        String.format("%.2f", e.getAmount())
+                });
+            }
         }
     }
 
@@ -300,6 +322,66 @@ public class ConsoleApp {
             JOptionPane.showMessageDialog(frame, "Invalid date format. Use YYYY-MM-DD.");
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(frame, "Invalid amount.");
+        }
+    }
+
+    private void editExpense() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(frame, "Please select an expense to edit.");
+            return;
+        }
+
+        int modelRow = table.convertRowIndexToModel(selectedRow);
+        int id = (int) tableModel.getValueAt(modelRow, 0);
+        Expense e = expenseManager.findById(id);
+
+        if (e == null) return;
+
+        // Create edit dialog
+        JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
+        JTextField editDateField = new JTextField(e.getDate().toString());
+        JComboBox<Category> editCategoryBox = new JComboBox<>();
+        for (String catName : Category.getCategoryList()) {
+            editCategoryBox.addItem(new Category(catName));
+        }
+        editCategoryBox.setSelectedItem(e.getCategory());
+        JTextField editDescField = new JTextField(e.getDescription());
+        JTextField editAmountField = new JTextField(String.valueOf(e.getAmount()));
+
+        panel.add(new JLabel("Date (YYYY-MM-DD):"));
+        panel.add(editDateField);
+        panel.add(new JLabel("Category:"));
+        panel.add(editCategoryBox);
+        panel.add(new JLabel("Description:"));
+        panel.add(editDescField);
+        panel.add(new JLabel("Amount:"));
+        panel.add(editAmountField);
+
+        int result = JOptionPane.showConfirmDialog(frame, panel, "Edit Expense", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                LocalDate newDate = LocalDate.parse(editDateField.getText().trim());
+                Category newCat = (Category) editCategoryBox.getSelectedItem();
+                String newDesc = editDescField.getText().trim();
+                double newAmount = Double.parseDouble(editAmountField.getText().trim());
+
+                if (newDesc.isEmpty()) {
+                    JOptionPane.showMessageDialog(frame, "Description cannot be empty.");
+                    return;
+                }
+
+                expenseManager.editExpense(id, newDate, newCat, newDesc, newAmount);
+                updateMonthFilterOptions();
+                refreshTable();
+                updateRemainingBalance();
+                saveData();
+            } catch (DateTimeParseException ex) {
+                JOptionPane.showMessageDialog(frame, "Invalid date format. Use YYYY-MM-DD.");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(frame, "Invalid amount.");
+            }
         }
     }
 
