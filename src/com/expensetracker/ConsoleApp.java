@@ -31,11 +31,11 @@ public class ConsoleApp {
     private JComboBox<Object> categoryBox;
     private JTextField descField;
     private JTextField amountField;
-    private JLabel salaryDisplayLabel;
+    private JLabel amountGivenDisplayLabel;
     private JLabel remainingLabel;
     private JTextArea balanceHistoryArea;
     private static final String CONFIG_FILE = DATA_DIR + "config.properties";
-    private double currentSalary = 0.0;
+    private double currentAmountGiven = 0.0;
 
     public ConsoleApp() {
         Category.loadCategories();
@@ -55,29 +55,29 @@ public class ConsoleApp {
         }
 
         initialize();
-        loadSalary();
+        loadAmountGiven();
         updateRemainingBalance();
     }
 
-    private void loadSalary() {
+    private void loadAmountGiven() {
         File file = new File(CONFIG_FILE);
         if (file.exists()) {
             try (java.io.FileInputStream fis = new java.io.FileInputStream(file)) {
                 java.util.Properties props = new java.util.Properties();
                 props.load(fis);
-                String val = props.getProperty("salary", "0.00");
-                currentSalary = Double.parseDouble(val);
-                salaryDisplayLabel.setText("Monthly Salary: " + String.format("%.2f", currentSalary));
+                String val = props.getProperty("amount_given", "0.00");
+                currentAmountGiven = Double.parseDouble(val);
+                amountGivenDisplayLabel.setText("Monthly Amount Given: " + String.format("%.2f", currentAmountGiven));
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void saveSalary(String salaryStr) {
+    private void saveAmountGiven(String amountGivenStr) {
         try (java.io.FileOutputStream fos = new java.io.FileOutputStream(CONFIG_FILE)) {
             java.util.Properties props = new java.util.Properties();
-            props.setProperty("salary", salaryStr);
+            props.setProperty("amount_given", amountGivenStr);
             props.store(fos, null);
         } catch (java.io.IOException e) {
             e.printStackTrace();
@@ -123,20 +123,20 @@ public class ConsoleApp {
         });
         filterPanel.add(searchField);
 
-        JPanel salaryPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        salaryDisplayLabel = new JLabel("Monthly Salary: 0.00");
-        salaryDisplayLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        JButton setSalaryBtn = new JButton("Set Salary");
-        setSalaryBtn.addActionListener(e -> setSalaryAction());
-        salaryPanel.add(salaryDisplayLabel);
-        salaryPanel.add(setSalaryBtn);
+        JPanel amountGivenPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        amountGivenDisplayLabel = new JLabel("Monthly Amount Given: 0.00");
+        amountGivenDisplayLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        JButton setAmountGivenBtn = new JButton("Set Amount Given");
+        setAmountGivenBtn.addActionListener(e -> setAmountGivenAction());
+        amountGivenPanel.add(amountGivenDisplayLabel);
+        amountGivenPanel.add(setAmountGivenBtn);
 
         refreshTable();
 
         JPanel northPanel = new JPanel(new BorderLayout());
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.add(filterPanel, BorderLayout.WEST);
-        topPanel.add(salaryPanel, BorderLayout.EAST);
+        topPanel.add(amountGivenPanel, BorderLayout.EAST);
         northPanel.add(topPanel, BorderLayout.NORTH);
 
         // --- Input Panel ---
@@ -195,6 +195,9 @@ public class ConsoleApp {
         JButton deleteButton = new JButton("Delete Selected");
         deleteButton.addActionListener(e -> deleteExpense());
 
+        JButton moveButton = new JButton("Move to Month");
+        moveButton.addActionListener(e -> moveSelectedExpenses());
+
         JButton setBudgetButton = new JButton("Set Budget");
         setBudgetButton.addActionListener(e -> setBudget());
 
@@ -212,6 +215,7 @@ public class ConsoleApp {
 
         actionPanel.add(editButton);
         actionPanel.add(deleteButton);
+        actionPanel.add(moveButton);
         actionPanel.add(setBudgetButton);
         actionPanel.add(viewAlertsButton);
         actionPanel.add(reportButton);
@@ -406,6 +410,42 @@ public class ConsoleApp {
         }
     }
 
+    private void moveSelectedExpenses() {
+        int[] selectedRows = table.getSelectedRows();
+        if (selectedRows.length == 0) {
+            JOptionPane.showMessageDialog(frame, "Please select one or more expenses to move.");
+            return;
+        }
+
+        String input = JOptionPane.showInputDialog(frame, "Enter target month (YYYY-MM):", YearMonth.now().toString());
+        if (input == null || input.trim().isEmpty()) return;
+
+        try {
+            YearMonth targetYM = YearMonth.parse(input.trim());
+            
+            for (int viewRow : selectedRows) {
+                int modelRow = table.convertRowIndexToModel(viewRow);
+                int id = (int) tableModel.getValueAt(modelRow, 0);
+                Expense e = expenseManager.findById(id);
+                if (e != null) {
+                    LocalDate oldDate = e.getDate();
+                    // Try to keep the same day, but adjust if it's invalid for the target month
+                    int newDay = Math.min(oldDate.getDayOfMonth(), targetYM.lengthOfMonth());
+                    LocalDate newDate = targetYM.atDay(newDay);
+                    expenseManager.editExpense(id, newDate, null, null, null);
+                }
+            }
+
+            updateMonthFilterOptions();
+            refreshTable();
+            updateRemainingBalance();
+            saveData();
+            JOptionPane.showMessageDialog(frame, "Successfully moved " + selectedRows.length + " item(s) to " + targetYM);
+        } catch (DateTimeParseException e) {
+            JOptionPane.showMessageDialog(frame, "Invalid month format. Use YYYY-MM.");
+        }
+    }
+
     private void refreshCategoryBox() {
         categoryBox.removeAllItems();
         for (String catName : Category.getCategoryList()) {
@@ -426,7 +466,7 @@ public class ConsoleApp {
         List<Expense> monthlyExpenses = expenseManager.getExpensesByMonth(targetYM.getMonthValue(), targetYM.getYear());
         double totalSpent = monthlyExpenses.stream().mapToDouble(Expense::getAmount).sum();
         
-        double currentBalance = currentSalary;
+        double currentBalance = currentAmountGiven;
         StringBuilder history = new StringBuilder();
         for (Expense e : monthlyExpenses) {
             currentBalance -= e.getAmount();
@@ -434,7 +474,7 @@ public class ConsoleApp {
         }
         balanceHistoryArea.setText(history.toString());
 
-        double remaining = currentSalary - totalSpent;
+        double remaining = currentAmountGiven - totalSpent;
         remainingLabel.setText(String.format("Balance for %s: %.2f", targetYM, remaining));
         if (remaining < 0) {
             remainingLabel.setForeground(Color.RED);
@@ -443,14 +483,14 @@ public class ConsoleApp {
         }
     }
 
-    private void setSalaryAction() {
-        String input = JOptionPane.showInputDialog(frame, "Enter Monthly Salary:", String.format("%.2f", currentSalary));
+    private void setAmountGivenAction() {
+        String input = JOptionPane.showInputDialog(frame, "Enter Monthly Amount Given:", String.format("%.2f", currentAmountGiven));
         if (input != null) {
             try {
-                double newSalary = Double.parseDouble(input.trim());
-                currentSalary = newSalary;
-                salaryDisplayLabel.setText("Monthly Salary: " + String.format("%.2f", currentSalary));
-                saveSalary(String.format("%.2f", currentSalary));
+                double newAmountGiven = Double.parseDouble(input.trim());
+                currentAmountGiven = newAmountGiven;
+                amountGivenDisplayLabel.setText("Monthly Amount Given: " + String.format("%.2f", currentAmountGiven));
+                saveAmountGiven(String.format("%.2f", currentAmountGiven));
                 updateRemainingBalance();
             } catch (NumberFormatException e) {
                 JOptionPane.showMessageDialog(frame, "Invalid amount.");
@@ -601,7 +641,7 @@ public class ConsoleApp {
             }
 
             double total = monthlyExpenses.stream().mapToDouble(Expense::getAmount).sum();
-            double balance = currentSalary - total;
+            double balance = currentAmountGiven - total;
 
             Map<String, Double> byCat = new HashMap<>();
             for (Expense e : monthlyExpenses) {
@@ -610,7 +650,7 @@ public class ConsoleApp {
             }
 
             StringBuilder sb = new StringBuilder("Report for " + input + "\n");
-            sb.append(String.format("Salary: %.2f\n", currentSalary));
+            sb.append(String.format("Amount Given: %.2f\n", currentAmountGiven));
             sb.append(String.format("Total Spent: %.2f\n", total));
             sb.append(String.format("Balance: %.2f\n\n", balance));
             sb.append("By Category:\n");
@@ -632,7 +672,7 @@ public class ConsoleApp {
     private void saveData() {
         try {
             expenseManager.saveToCsv(CSV_FILE);
-            saveSalary(String.format("%.2f", currentSalary));
+            saveAmountGiven(String.format("%.2f", currentAmountGiven));
         } catch (Exception e) {
             JOptionPane.showMessageDialog(frame, "Error saving data: " + e.getMessage());
         }
@@ -662,23 +702,23 @@ public class ConsoleApp {
             File exportFile = new File(dir, fileName);
 
             try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(exportFile))) {
-                writer.write("ID,Date,Category,Description,Amount");
+                writer.write("item,price");
                 writer.newLine();
 
                 int rowCount = 1; // header is row 1
                 for (Expense e : monthlyExpenses) {
-                    writer.write(String.format("%d,%s,%s,\"%s\",%.2f",
-                            e.getId(), e.getDate(), e.getCategory(), e.getDescription().replace("\"", "\"\""), e.getAmount()));
+                    writer.write(String.format("\"%s\",%.2f",
+                            e.getDescription().replace("\"", "\"\""), e.getAmount()));
                     writer.newLine();
                     rowCount++;
                 }
 
                 writer.newLine();
-                writer.write("Salary,,," + String.format("%.2f", currentSalary));
+                writer.write("amount given," + String.format("%.2f", currentAmountGiven));
                 writer.newLine();
-                writer.write("Total Spent,,,=SUM(E2:E" + rowCount + ")");
+                writer.write("Total Spent,=SUM(B2:B" + rowCount + ")");
                 writer.newLine();
-                writer.write("Balance,,,=D" + (rowCount + 2) + "-D" + (rowCount + 3));
+                writer.write("Balance,=B" + (rowCount + 2) + "-B" + (rowCount + 3));
                 writer.newLine();
 
                 JOptionPane.showMessageDialog(frame, "Report exported to " + exportFile.getAbsolutePath());
